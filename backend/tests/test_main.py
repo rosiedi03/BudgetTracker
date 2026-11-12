@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
-from budgettracker.main import app, expenses, incomes, users
+from budgettracker.main import app
+from budgettracker.routers.auth import users
+from budgettracker.routers.transactions import expenses, incomes
 
 client = TestClient(app)
 

@@ -1,109 +1,61 @@
-from datetime import date
+"""Creates the FastAPI app: startup, middleware, and routers. Endpoints live in routers/."""
 
-from fastapi import FastAPI, HTTPException
-from pwdlib import PasswordHash
-from pydantic import BaseModel, Field
+import logging
+import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
-# Create the Budget Tracker backend application
-app = FastAPI(title="Budget Tracker API")
+from fastapi import FastAPI, Request, Response, status
+from fastapi.responses import JSONResponse
 
+from budgettracker.db import engine, init_db
+from budgettracker.routers import auth, health, transactions
 
-# Check if the backend server is running
-@app.get("/health")
-def health_check():
-    return {"status": "running"}
-
-
-# Expense information received from the frontend
-class Expense(BaseModel):
-    amount: float = Field(gt=0)
-    category: str
-    date: date
-    description: str = ""
-    payer: str = ""
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+request_logger = logging.getLogger("budgettracker.requests")
 
 
-# Temporary storage until the database is connected
-expenses = []
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+    """Runs once at startup (before `yield`) and shutdown (after)."""
+    init_db(engine)
+    yield
 
 
-@app.post("/expenses")
-def add_expense(expense: Expense):
-    expenses.append(expense.model_dump(mode="json"))
-    return {"message": "Expense added successfully"}
+app = FastAPI(title="Budget Tracker API", lifespan=lifespan)
 
 
-@app.get("/expenses")
-def get_expenses():
-    return expenses
+@app.middleware("http")
+async def log_requests(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Log every request, and turn unhandled errors into a generic 500 with the traceback logged.
+
+    Only method, path, status, duration, and user id are logged; never bodies, headers, or tokens.
+    """
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        request_logger.exception("Unhandled error in %s %s", request.method, request.url.path)
+        response = JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "Internal server error"},
+        )
+    duration_ms = (time.perf_counter() - start) * 1000
+    # get_current_user sets request.state.user_id; it's absent on unauthenticated requests.
+    user_id = getattr(request.state, "user_id", None)
+    request_logger.info(
+        "%s %s %d %.1fms user=%s",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+        user_id,
+    )
+    return response
 
 
-# Income information received from the frontend
-class Income(BaseModel):
-    amount: float = Field(gt=0)
-    source: str
-    date: date
-    description: str = ""
-
-
-# Temporary income storage
-incomes = []
-
-
-@app.post("/income")
-def add_income(income: Income):
-    incomes.append(income.model_dump(mode="json"))
-    return {"message": "Income added successfully"}
-
-
-@app.get("/income")
-def get_income():
-    return incomes
-
-
-# Update an existing expense
-@app.put("/expenses/{index}")
-def update_expense(index: int, expense: Expense):
-    if index < 0 or index >= len(expenses):
-        raise HTTPException(status_code=404, detail="Expense not found")
-    expenses[index] = expense.model_dump(mode="json")
-    return {"message": "Expense updated successfully"}
-
-
-# Delete an existing expense
-@app.delete("/expenses/{index}")
-def delete_expense(index: int):
-    if index < 0 or index >= len(expenses):
-        raise HTTPException(status_code=404, detail="Expense not found")
-    expenses.pop(index)
-    return {"message": "Expense deleted successfully"}
-
-
-# Password hashing and temporary user storage
-password_hash = PasswordHash.recommended()
-users = {}
-
-
-class User(BaseModel):
-    email: str
-    password: str = Field(min_length=8)
-
-
-# Register a new user
-@app.post("/register")
-def register(user: User):
-    email = user.email.strip().lower()
-    if email in users:
-        raise HTTPException(status_code=409, detail="User already exists")
-    users[email] = password_hash.hash(user.password)
-    return {"message": "Registration successful"}
-
-
-# Verify user login
-@app.post("/login")
-def login(user: User):
-    email = user.email.strip().lower()
-    saved_password = users.get(email)
-    if not saved_password or not password_hash.verify(user.password, saved_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"message": "Login successful"}
+app.include_router(health.router)
+app.include_router(transactions.router)
+app.include_router(auth.router)
