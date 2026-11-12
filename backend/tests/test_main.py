@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from main import app, expenses, incomes, users
+from budgettracker.main import app, expenses, incomes, users
 
 client = TestClient(app)
 
