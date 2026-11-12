@@ -18,6 +18,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.414",
     "pytest>=9.2.0",
     "ruff>=0.17.5",
 ]
@@ -29,5 +30,12 @@ entrypoint = "budgettracker.main:app"
 line-length = 100
 
 [tool.ruff.lint]
-# E/W: pycodestyle, F: pyflakes, I: import sorting, UP: modern syntax, B: likely bugs, SIM: simplifications
-select = ["E", "W", "F", "I", "UP", "B", "SIM"]
+# E/W: pycodestyle, F: pyflakes, I: import sorting, UP: modern syntax, B: likely bugs,
+# SIM: simplifications, ARG: unused arguments (prefix intentionally unused ones with _)
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "ARG"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+reportDeprecated = "error"
