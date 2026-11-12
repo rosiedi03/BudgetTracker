@@ -1,7 +1,9 @@
 from fastapi.testclient import TestClient
+
 from budgettracker.main import app, expenses, incomes, users
 
 client = TestClient(app)
+
 
 # Test that the server responds
 def test_health():
@@ -13,11 +15,7 @@ def test_health():
 def test_expense():
     expenses.clear()
 
-    data = {
-        "amount": 50,
-        "category": "Groceries",
-        "date": "2026-11-11"
-    }
+    data = {"amount": 50, "category": "Groceries", "date": "2026-11-11"}
 
     response = client.post("/expenses", json=data)
     assert response.status_code == 200
@@ -28,19 +26,17 @@ def test_expense():
 
     expenses.clear()
 
+
 # Test that negative amounts are rejected
 def test_invalid_expense():
     expenses.clear()
 
-    data = {
-        "amount": -50,
-        "category": "Groceries",
-        "date": "2026-11-11"
-    }
+    data = {"amount": -50, "category": "Groceries", "date": "2026-11-11"}
 
     response = client.post("/expenses", json=data)
     assert response.status_code == 422
     assert expenses == []
+
 
 # Test adding and retrieving income
 def test_income():
@@ -53,6 +49,7 @@ def test_income():
     assert response.json()[0]["amount"] == 1500
     incomes.clear()
 
+
 # Test invalid income
 def test_invalid_income():
     incomes.clear()
@@ -60,6 +57,7 @@ def test_invalid_income():
     response = client.post("/income", json=data)
     assert response.status_code == 422
     assert incomes == []
+
 
 # Test updating an expense
 def test_update_expense():
@@ -72,6 +70,7 @@ def test_update_expense():
     assert client.get("/expenses").json()[0]["amount"] == 75
     expenses.clear()
 
+
 # Test deleting an expense
 def test_delete_expense():
     expenses.clear()
@@ -80,6 +79,7 @@ def test_delete_expense():
     response = client.delete("/expenses/0")
     assert response.status_code == 200
     assert client.get("/expenses").json() == []
+
 
 # Test registration and login
 def test_register_login():
@@ -91,6 +91,7 @@ def test_register_login():
     response = client.post("/login", json=data)
     assert response.status_code == 200
     users.clear()
+
 
 # Test incorrect password
 def test_invalid_login():
