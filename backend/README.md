@@ -31,11 +31,18 @@ Once it's running:
 - Interactive API docs (Swagger UI): <http://127.0.0.1:8000/docs>
 - Health check: <http://127.0.0.1:8000/health>
 
-## Running tests
+## Tests and checks
+
+Run all four before committing; each should finish with no errors.
 
 ```sh
-uv run pytest
+uv run pytest               # tests
+uv run ruff check           # lint (add --fix to auto-fix what it can)
+uv run ruff format --check  # formatting (run without --check to reformat files)
+uv run pyright              # type checking
 ```
+
+Lint and type-checker settings live in `pyproject.toml` under `[tool.ruff]` and `[tool.pyright]`. The first `pyright` run downloads its own copy of Node.js, so it needs internet access once.
 
 ## Managing dependencies
 
@@ -57,10 +64,16 @@ backend/
 ├── uv.lock                 # pinned dependency versions (commit this)
 ├── src/
 │   └── budgettracker/      # the application package
-│       ├── __init__.py
-│       └── main.py         # FastAPI app and routes
+│       ├── main.py         # creates the app; startup, middleware, router wiring
+│       ├── db.py           # database engine, sessions, startup seeding
+│       ├── models.py       # database tables (SQLAlchemy models)
+│       ├── deps.py         # shared endpoint dependencies (current user)
+│       └── routers/        # endpoints, one module per area
 └── tests/
-    └── test_main.py
 ```
+
+The database is a SQLite file, `budgettracker.db`, created in the directory you start the server
+from. Set `BUDGETTRACKER_DATABASE_URL` to use a different location. There are no migrations: after a
+model changes, delete the `.db` file and restart.
 
 Code lives in an installable package under `src/`, so imports use the package name, for example `from budgettracker.main import app`.
