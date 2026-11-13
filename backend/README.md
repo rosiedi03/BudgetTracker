@@ -31,6 +31,12 @@ Once it's running:
 - Interactive API docs (Swagger UI): <http://127.0.0.1:8000/docs>
 - Health check: <http://127.0.0.1:8000/health>
 
+## API conventions (for frontend work)
+
+The interactive docs at `/docs` list every endpoint and field. A few rules apply everywhere:
+
+- **Money** is a JSON string with exactly two decimal places: `"12.50"`. Requests accept a string or a number (`"12.50"` or `12.5`), but amounts must be positive, at most `99999999.99`, and have no fractions of a cent. Parse responses with a decimal-safe approach, not floating-point math.
+
 ## Tests and checks
 
 Run all four before committing; each should finish with no errors.
@@ -68,6 +74,7 @@ backend/
 │       ├── db.py           # database engine, sessions, startup seeding
 │       ├── models.py       # database tables (SQLAlchemy models)
 │       ├── deps.py         # shared endpoint dependencies (current user)
+│       ├── schemas/        # request/response shapes; money.py handles amounts and cents
 │       └── routers/        # endpoints, one module per area
 └── tests/
     ├── conftest.py         # shared fixtures (test database, users, adding transactions)
