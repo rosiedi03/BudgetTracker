@@ -1,15 +1,16 @@
-
 import hashlib
 import secrets
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 from pwdlib import PasswordHash
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from budgettracker.deps import AuthenticatedUserDep
+
 from budgettracker.db import SessionDep
-from budgettracker.models import AuthToken, User as DBUser
+from budgettracker.deps import AuthenticatedUserDep
+from budgettracker.models import AuthToken
+from budgettracker.models import User as DBUser
 
 router = APIRouter(tags=["auth"])
 password_hash = PasswordHash.recommended()
@@ -49,17 +50,16 @@ def login(data: LoginData, session: SessionDep):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    session.add(AuthToken(
-        user_id=user.id,
-        token_hash=token_hash,
-        expires_at=datetime.now(UTC) + timedelta(hours=24)
-    ))
+    session.add(
+        AuthToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=datetime.now(UTC) + timedelta(hours=24),
+        )
+    )
     session.commit()
-    return {
-        "message": "Login successful",
-        "access_token": token,
-        "token_type": "bearer"
-    }
+    return {"message": "Login successful", "access_token": token, "token_type": "bearer"}
+
 
 # Return the logged-in user's information
 @router.get("/me")

@@ -36,9 +36,7 @@ def get_authenticated_user(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     token_hash = hashlib.sha256(credentials.credentials.encode()).hexdigest()
-    token = session.scalar(
-        select(AuthToken).where(AuthToken.token_hash == token_hash)
-    )
+    token = session.scalar(select(AuthToken).where(AuthToken.token_hash == token_hash))
 
     if token is None or token.expires_at <= datetime.now(UTC):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
