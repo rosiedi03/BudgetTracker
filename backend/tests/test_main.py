@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
-
 from budgettracker.main import app
-from budgettracker.routers.auth import users
 from budgettracker.routers.transactions import expenses, incomes
+from datetime import UTC, datetime, timedelta
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from budgettracker.models import AuthToken
 
 client = TestClient(app)
 
@@ -85,22 +87,60 @@ def test_delete_expense():
 
 # Test registration and login
 def test_register_login():
-    users.clear()
     data = {"email": "test@example.com", "password": "TestPass123"}
     response = client.post("/register", json=data)
     assert response.status_code == 200
-    assert users[data["email"]] != data["password"]
+
     response = client.post("/login", json=data)
     assert response.status_code == 200
-    users.clear()
+    assert response.json()["token_type"] == "bearer"
+    assert response.json()["access_token"]
 
 
 # Test incorrect password
 def test_invalid_login():
-    users.clear()
     data = {"email": "test@example.com", "password": "TestPass123"}
     client.post("/register", json=data)
+
     data["password"] = "WrongPass123"
     response = client.post("/login", json=data)
     assert response.status_code == 401
-    users.clear()
+
+
+# Test access with a valid token
+def test_valid_token():
+    data = {"email": "secure@example.com", "password": "TestPass123"}
+    client.post("/register", json=data)
+    response = client.post("/login", json=data)
+    token = response.json()["access_token"]
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json()["email"] == data["email"]
+
+# Test access without a token
+def test_missing_token():
+    response = client.get("/me")
+    assert response.status_code == 401
+
+# Test access with an invalid token
+def test_invalid_token():
+    response = client.get("/me", headers={"Authorization": "Bearer invalid-token"})
+    assert response.status_code == 401
+
+# Test that expired tokens are rejected
+def test_expired_token(session: Session):
+    data = {"email": "expired@example.com", "password": "TestPass123"}
+    client.post("/register", json=data)
+    response = client.post("/login", json=data)
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+
+    # Set the token expiration to the past
+    saved_token = session.scalar(select(AuthToken))
+    assert saved_token is not None
+    saved_token.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    session.commit()
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
