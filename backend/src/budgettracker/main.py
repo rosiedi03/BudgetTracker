@@ -56,7 +56,7 @@ async def log_requests(
             content={"detail": "Internal server error"},
         )
     duration_ms = (time.perf_counter() - start) * 1000
-    # get_current_user sets request.state.user_id; it's absent on unauthenticated requests.
+    # get_authenticated_user sets request.state.user_id; it's absent on unauthenticated requests.
     user_id = getattr(request.state, "user_id", None)
     request_logger.info(
         "%s %s %d %.1fms user=%s",

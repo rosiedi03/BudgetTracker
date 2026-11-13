@@ -8,20 +8,8 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 
-from budgettracker.db import DEV_USER_EMAIL, SessionDep
+from budgettracker.db import SessionDep
 from budgettracker.models import AuthToken, User
-
-
-# Temporary development user
-def get_current_user(request: Request, session: SessionDep) -> User:
-    user = session.scalar(select(User).where(User.email == DEV_USER_EMAIL))
-    if user is None:
-        raise RuntimeError("Dev user is missing")
-    request.state.user_id = user.id
-    return user
-
-
-CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 bearer = HTTPBearer(auto_error=False)
 

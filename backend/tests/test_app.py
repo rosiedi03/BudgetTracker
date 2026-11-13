@@ -9,14 +9,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from budgettracker.db import DEV_USER_EMAIL, create_db_engine, get_session
-from budgettracker.deps import CurrentUserDep
+from budgettracker.deps import AuthenticatedUserDep
 from budgettracker.main import app, log_requests
+from budgettracker.models import User
+from tests.helpers import TokenFor
 
 REQUEST_LOGGER = "budgettracker.requests"
 
 
 @pytest.fixture
-def probe_client() -> TestClient:
+def probe_client(dev_user: User, token_for: TokenFor) -> TestClient:
     """A small app with the real logging middleware and test-only routes.
 
     Keeps test routes out of the real app while exercising the same middleware and dependencies.
@@ -25,7 +27,7 @@ def probe_client() -> TestClient:
     probe.middleware("http")(log_requests)
 
     @probe.get("/whoami")
-    def whoami(user: CurrentUserDep) -> dict:
+    def whoami(user: AuthenticatedUserDep) -> dict:
         return {"id": user.id, "email": user.email}
 
     @probe.post("/submit")
@@ -37,7 +39,7 @@ def probe_client() -> TestClient:
         raise RuntimeError("internal detail that must not reach the client")
 
     probe.dependency_overrides = app.dependency_overrides
-    return TestClient(probe)
+    return TestClient(probe, headers=token_for(dev_user))
 
 
 def request_log_lines(caplog: pytest.LogCaptureFixture) -> list[str]:

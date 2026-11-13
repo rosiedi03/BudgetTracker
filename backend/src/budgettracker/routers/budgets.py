@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from budgettracker.budgets import find_monthly_budget, set_monthly_budget
 from budgettracker.db import SessionDep
-from budgettracker.deps import CurrentUserDep
+from budgettracker.deps import AuthenticatedUserDep
 from budgettracker.reports import budget_status
 from budgettracker.schemas.budgets import BudgetIn, BudgetOut, BudgetStatusOut
 from budgettracker.schemas.money import (
@@ -17,7 +17,7 @@ router = APIRouter(tags=["budgets"])
 
 @router.put("/budgets/{year}/{month}")
 def set_budget(
-    year: Year, month: Month, budget: BudgetIn, session: SessionDep, user: CurrentUserDep
+    year: Year, month: Month, budget: BudgetIn, session: SessionDep, user: AuthenticatedUserDep
 ) -> BudgetOut:
     """Set the spending limit for a month, replacing any existing one."""
     saved = set_monthly_budget(session, user, year, month, decimal_to_cents(budget.limit))
@@ -26,7 +26,9 @@ def set_budget(
 
 
 @router.get("/budgets/{year}/{month}")
-def get_budget(year: Year, month: Month, session: SessionDep, user: CurrentUserDep) -> BudgetOut:
+def get_budget(
+    year: Year, month: Month, session: SessionDep, user: AuthenticatedUserDep
+) -> BudgetOut:
     """The spending limit for a month. 404 if none has been set."""
     budget = find_monthly_budget(session, user, year, month)
     if budget is None:
@@ -38,7 +40,7 @@ def get_budget(year: Year, month: Month, session: SessionDep, user: CurrentUserD
 
 @router.get("/budgets/{year}/{month}/status")
 def get_budget_status(
-    year: Year, month: Month, session: SessionDep, user: CurrentUserDep
+    year: Year, month: Month, session: SessionDep, user: AuthenticatedUserDep
 ) -> BudgetStatusOut:
     """The month's budget, how much has been spent, and how much is left."""
     result = budget_status(session, user, year, month)

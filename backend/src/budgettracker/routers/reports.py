@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from budgettracker.db import SessionDep
-from budgettracker.deps import CurrentUserDep
+from budgettracker.deps import AuthenticatedUserDep
 from budgettracker.reports import CategorySpending, monthly_summary, spending_by_category
 from budgettracker.schemas.money import cents_to_decimal, optional_cents_to_decimal
 from budgettracker.schemas.period import Month, Year
@@ -17,7 +17,7 @@ router = APIRouter(tags=["reports"])
 
 @router.get("/reports/{year}/{month}/spending-by-category")
 def get_spending_by_category(
-    year: Year, month: Month, session: SessionDep, user: CurrentUserDep
+    year: Year, month: Month, session: SessionDep, user: AuthenticatedUserDep
 ) -> SpendingByCategoryOut:
     """The month's expenses split by category, largest first."""
     result = spending_by_category(session, user, year, month)
@@ -29,7 +29,7 @@ def get_spending_by_category(
 
 @router.get("/reports/{year}/{month}/summary")
 def get_monthly_summary(
-    year: Year, month: Month, session: SessionDep, user: CurrentUserDep
+    year: Year, month: Month, session: SessionDep, user: AuthenticatedUserDep
 ) -> MonthlySummaryOut:
     """Income, spending, budget, category breakdown, and year-to-date totals for the month."""
     result = monthly_summary(session, user, year, month)

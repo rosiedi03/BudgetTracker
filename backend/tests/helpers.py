@@ -36,3 +36,11 @@ class AddIncome(Protocol):
     def __call__(
         self, amount_cents: int, on: datetime.date, user: User | None = None
     ) -> Transaction: ...
+
+
+class TokenFor(Protocol):
+    """The token_for fixture: headers = token_for(user); client.get(path, headers=headers)."""
+
+    def __call__(
+        self, user: User, expires_at: datetime.datetime | None = None
+    ) -> dict[str, str]: ...

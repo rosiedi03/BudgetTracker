@@ -5,6 +5,7 @@ each other.
 """
 
 import datetime
+import secrets
 import shutil
 from collections.abc import Generator
 from pathlib import Path
@@ -16,10 +17,10 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from budgettracker.db import DEV_USER_EMAIL, create_db_engine, get_session, init_db
-from budgettracker.deps import get_current_user
+from budgettracker.deps import get_authenticated_user, hash_token
 from budgettracker.main import app
-from budgettracker.models import Transaction, TransactionType, User
-from tests.helpers import FOOD, ActAs, AddExpense, AddIncome
+from budgettracker.models import AuthToken, Transaction, TransactionType, User, utc_now
+from tests.helpers import FOOD, ActAs, AddExpense, AddIncome, TokenFor
 
 
 @pytest.fixture(scope="session")
@@ -67,9 +68,27 @@ def use_test_database(db_engine: Engine) -> Generator[None]:
 
 
 @pytest.fixture
-def client() -> TestClient:
-    """Sends requests to the app without running a server."""
-    return TestClient(app)
+def token_for(session: Session) -> TokenFor:
+    """A function that creates a login token for a user and returns request headers that use it.
+
+    token_for(user) gives a token that's valid for a day; pass expires_at for a different expiry.
+    """
+
+    def create(user: User, expires_at: datetime.datetime | None = None) -> dict[str, str]:
+        if expires_at is None:
+            expires_at = utc_now() + datetime.timedelta(days=1)
+        token = secrets.token_urlsafe(16)
+        session.add(AuthToken(user_id=user.id, token_hash=hash_token(token), expires_at=expires_at))
+        session.commit()
+        return {"Authorization": f"Bearer {token}"}
+
+    return create
+
+
+@pytest.fixture
+def client(dev_user: User, token_for: TokenFor) -> TestClient:
+    """Sends requests to the app without running a server, logged in as the dev user."""
+    return TestClient(app, headers=token_for(dev_user))
 
 
 @pytest.fixture
@@ -92,7 +111,7 @@ def act_as() -> ActAs:
     """A function that switches users: after act_as(user), requests in the test act as `user`."""
 
     def switch(user: User) -> None:
-        app.dependency_overrides[get_current_user] = lambda: user
+        app.dependency_overrides[get_authenticated_user] = lambda: user
 
     return switch
 
@@ -104,7 +123,7 @@ def logged_out() -> None:
     def reject() -> User:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    app.dependency_overrides[get_current_user] = reject
+    app.dependency_overrides[get_authenticated_user] = reject
 
 
 @pytest.fixture
