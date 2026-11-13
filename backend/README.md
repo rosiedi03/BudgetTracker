@@ -36,6 +36,7 @@ Once it's running:
 The interactive docs at `/docs` list every endpoint and field. A few rules apply everywhere:
 
 - **Money** is a JSON string with exactly two decimal places: `"12.50"`. Requests accept a string or a number (`"12.50"` or `12.5`), but amounts must be positive, at most `99999999.99`, and have no fractions of a cent. Parse responses with a decimal-safe approach, not floating-point math.
+- **Percentages** are JSON numbers rounded to one decimal place: `45.5`. Shares under 0.05% round to `0.0`. If a percentage is `0.0` but its matching amount isn't zero, display it as `<0.1%`. Rounded percentages may not add up to exactly 100.
 
 ## Tests and checks
 
