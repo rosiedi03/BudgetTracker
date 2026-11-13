@@ -116,6 +116,62 @@ def spending_by_category(session: Session, user: User, year: int, month: int) ->
     return SpendingByCategory(total_spent_cents=total_spent_cents, categories=categories)
 
 
+@dataclass
+class TopCategory:
+    category_id: int
+    category_name: str
+    total_cents: int
+
+
+@dataclass
+class MonthlySummary:
+    """Everything the dashboard shows for one month. Budget fields are None if none is set."""
+
+    year: int
+    month: int
+    total_income_cents: int
+    total_expenses_cents: int
+    budget_cents: int | None
+    remaining_cents: int | None
+    percent_used: Decimal | None
+    categories: list[CategorySpending]  # same as spending_by_category
+    top_category: TopCategory | None  # None if there are no expenses
+    ytd_income_cents: int  # January 1 through the end of this month
+    ytd_expenses_cents: int
+
+
+def monthly_summary(session: Session, user: User, year: int, month: int) -> MonthlySummary:
+    """The user's income, spending, and budget for the month, plus year-to-date totals."""
+    # Reuse the other reports so the summary always agrees with them.
+    budget = budget_status(session, user, year, month)
+    spending = spending_by_category(session, user, year, month)
+
+    # The breakdown is already sorted (total, then name), so its first entry is the top category.
+    top_category = None
+    if spending.categories:
+        first = spending.categories[0]
+        top_category = TopCategory(first.category_id, first.category_name, first.total_cents)
+
+    month_start, month_end = month_date_range(year, month)
+    ytd_start, ytd_end = year_to_date_range(year, month)
+    income_cents = _total_cents(session, user, TransactionType.income, month_start, month_end)
+    ytd_income_cents = _total_cents(session, user, TransactionType.income, ytd_start, ytd_end)
+    ytd_expenses_cents = _total_cents(session, user, TransactionType.expense, ytd_start, ytd_end)
+    return MonthlySummary(
+        year=year,
+        month=month,
+        total_income_cents=income_cents,
+        total_expenses_cents=budget.spent_cents,
+        budget_cents=budget.limit_cents,
+        remaining_cents=budget.remaining_cents,
+        percent_used=budget.percent_used,
+        categories=spending.categories,
+        top_category=top_category,
+        ytd_income_cents=ytd_income_cents,
+        ytd_expenses_cents=ytd_expenses_cents,
+    )
+
+
 def _total_cents(
     session: Session,
     user: User,
