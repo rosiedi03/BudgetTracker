@@ -26,6 +26,11 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 bearer = HTTPBearer(auto_error=False)
 
 
+def hash_token(token: str) -> str:
+    """The value stored for a login token. Tokens themselves are never stored."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 # Verify authentication token
 def get_authenticated_user(
     request: Request,
@@ -35,7 +40,7 @@ def get_authenticated_user(
     if credentials is None:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    token_hash = hashlib.sha256(credentials.credentials.encode()).hexdigest()
+    token_hash = hash_token(credentials.credentials)
     token = session.scalar(select(AuthToken).where(AuthToken.token_hash == token_hash))
 
     if token is None or token.expires_at <= datetime.now(UTC):

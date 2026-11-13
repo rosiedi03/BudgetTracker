@@ -1,4 +1,3 @@
-import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -8,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from budgettracker.db import SessionDep
-from budgettracker.deps import AuthenticatedUserDep
+from budgettracker.deps import AuthenticatedUserDep, hash_token
 from budgettracker.models import AuthToken
 from budgettracker.models import User as DBUser
 
@@ -49,7 +48,7 @@ def login(data: LoginData, session: SessionDep):
     if not user or not password_hash.verify(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    token_hash = hash_token(token)
     session.add(
         AuthToken(
             user_id=user.id,
