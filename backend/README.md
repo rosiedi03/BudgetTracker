@@ -75,6 +75,7 @@ backend/
 │       ├── db.py           # database engine, sessions, startup seeding
 │       ├── models.py       # database tables (SQLAlchemy models)
 │       ├── deps.py         # shared endpoint dependencies (current user)
+│       ├── budgets.py      # saving and looking up monthly budgets
 │       ├── schemas/        # request/response shapes; money.py handles amounts and cents
 │       └── routers/        # endpoints, one module per area
 └── tests/
