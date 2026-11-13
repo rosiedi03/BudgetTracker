@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from budgettracker.db import engine, init_db
-from budgettracker.routers import auth, health, transactions
+from budgettracker.routers import auth, categories, health, transactions
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 request_logger = logging.getLogger("budgettracker.requests")
@@ -57,5 +57,6 @@ async def log_requests(
 
 
 app.include_router(health.router)
+app.include_router(categories.router)
 app.include_router(transactions.router)
 app.include_router(auth.router)
