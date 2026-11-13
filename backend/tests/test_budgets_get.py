@@ -9,9 +9,9 @@ from tests.helpers import ActAs
 
 
 @pytest.fixture
-def november_budget(session: Session, dev_user: User) -> None:
+def november_budget(session: Session, main_user: User) -> None:
     """The dev user has a 500.00 budget for November 2026."""
-    session.add(MonthlyBudget(user_id=dev_user.id, year=2026, month=11, limit_cents=50000))
+    session.add(MonthlyBudget(user_id=main_user.id, year=2026, month=11, limit_cents=50000))
     session.commit()
 
 

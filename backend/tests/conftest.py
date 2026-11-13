@@ -86,13 +86,13 @@ def token_for(session: Session) -> TokenFor:
 
 
 @pytest.fixture
-def client(dev_user: User, token_for: TokenFor) -> TestClient:
+def client(main_user: User, token_for: TokenFor) -> TestClient:
     """Sends requests to the app without running a server, logged in as the dev user."""
-    return TestClient(app, headers=token_for(dev_user))
+    return TestClient(app, headers=token_for(main_user))
 
 
 @pytest.fixture
-def dev_user(session: Session) -> User:
+def main_user(session: Session) -> User:
     """The seeded user that requests act as by default."""
     return session.scalars(select(User).where(User.email == DEV_USER_EMAIL)).one()
 
@@ -127,7 +127,7 @@ def logged_out() -> None:
 
 
 @pytest.fixture
-def add_expense(session: Session, dev_user: User) -> AddExpense:
+def add_expense(session: Session, main_user: User) -> AddExpense:
     """A function that saves an expense: add_expense(1250, date(2026, 11, 5)).
 
     Optional: category_id (default Food) and user (default the dev user).
@@ -139,7 +139,7 @@ def add_expense(session: Session, dev_user: User) -> AddExpense:
         category_id: int = FOOD,
         user: User | None = None,
     ) -> Transaction:
-        owner = dev_user if user is None else user
+        owner = main_user if user is None else user
         transaction = Transaction(
             user_id=owner.id,
             type=TransactionType.expense,
@@ -155,11 +155,11 @@ def add_expense(session: Session, dev_user: User) -> AddExpense:
 
 
 @pytest.fixture
-def add_income(session: Session, dev_user: User) -> AddIncome:
+def add_income(session: Session, main_user: User) -> AddIncome:
     """A function that saves income: add_income(500000, date(2026, 11, 1)). Optional: user."""
 
     def add(amount_cents: int, on: datetime.date, user: User | None = None) -> Transaction:
-        owner = dev_user if user is None else user
+        owner = main_user if user is None else user
         transaction = Transaction(
             user_id=owner.id, type=TransactionType.income, amount_cents=amount_cents, date=on
         )

@@ -39,9 +39,9 @@ def test_with_an_unknown_token_returns_401(method: str, path: str):
 
 @pytest.mark.parametrize(("method", "path"), ENDPOINTS)
 def test_with_an_expired_token_returns_401(
-    dev_user: User, token_for: TokenFor, method: str, path: str
+    main_user: User, token_for: TokenFor, method: str, path: str
 ):
-    headers = token_for(dev_user, expires_at=utc_now() - datetime.timedelta(minutes=1))
+    headers = token_for(main_user, expires_at=utc_now() - datetime.timedelta(minutes=1))
     assert send(method, path, headers).status_code == 401
 
 
@@ -59,16 +59,16 @@ def test_with_an_expired_token_returns_401(
     ],
 )
 def test_with_a_valid_token_works(
-    dev_user: User, token_for: TokenFor, method: str, path: str, expected_status: int
+    main_user: User, token_for: TokenFor, method: str, path: str, expected_status: int
 ):
-    assert send(method, path, token_for(dev_user)).status_code == expected_status
+    assert send(method, path, token_for(main_user)).status_code == expected_status
 
 
 def test_the_token_decides_whose_data_is_used(
-    dev_user: User, other_user: User, token_for: TokenFor, add_expense: AddExpense
+    main_user: User, other_user: User, token_for: TokenFor, add_expense: AddExpense
 ):
     add_expense(1000, date(2026, 11, 5))  # the dev user's
-    dev_headers = token_for(dev_user)
+    dev_headers = token_for(main_user)
     other_headers = token_for(other_user)
 
     dev_summary = send("GET", "/reports/2026/11/summary", dev_headers)

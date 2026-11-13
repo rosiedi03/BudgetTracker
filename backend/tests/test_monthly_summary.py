@@ -34,7 +34,7 @@ def november(session: Session, user: User) -> MonthlySummary:
 
 @pytest.fixture
 def example_year(
-    session: Session, dev_user: User, add_expense: AddExpense, add_income: AddIncome
+    session: Session, main_user: User, add_expense: AddExpense, add_income: AddIncome
 ) -> None:
     """A year of the dev user's data, built around November 2026.
 
@@ -45,7 +45,7 @@ def example_year(
     Outside November and its year-to-date (never counted): December 2026, January 2027, and
     November 2025.
     """
-    session.add(MonthlyBudget(user_id=dev_user.id, year=2026, month=11, limit_cents=200000))
+    session.add(MonthlyBudget(user_id=main_user.id, year=2026, month=11, limit_cents=200000))
     session.commit()
 
     add_income(300000, date(2026, 11, 1))
@@ -68,8 +68,8 @@ def example_year(
 # Report function
 
 
-def test_empty_month(session: Session, dev_user: User):
-    assert november(session, dev_user) == MonthlySummary(
+def test_empty_month(session: Session, main_user: User):
+    assert november(session, main_user) == MonthlySummary(
         year=2026,
         month=11,
         total_income_cents=0,
@@ -85,8 +85,8 @@ def test_empty_month(session: Session, dev_user: User):
 
 
 @pytest.mark.usefixtures("example_year")
-def test_full_summary(session: Session, dev_user: User):
-    assert november(session, dev_user) == MonthlySummary(
+def test_full_summary(session: Session, main_user: User):
+    assert november(session, main_user) == MonthlySummary(
         year=2026,
         month=11,
         total_income_cents=300000,
@@ -106,10 +106,10 @@ def test_full_summary(session: Session, dev_user: User):
 
 
 @pytest.mark.usefixtures("example_year")
-def test_matches_budget_status_and_spending_by_category(session: Session, dev_user: User):
-    summary = november(session, dev_user)
-    budget = budget_status(session, dev_user, 2026, 11)
-    spending = spending_by_category(session, dev_user, 2026, 11)
+def test_matches_budget_status_and_spending_by_category(session: Session, main_user: User):
+    summary = november(session, main_user)
+    budget = budget_status(session, main_user, 2026, 11)
+    spending = spending_by_category(session, main_user, 2026, 11)
 
     assert summary.total_expenses_cents == budget.spent_cents == spending.total_spent_cents
     assert summary.budget_cents == budget.limit_cents
@@ -118,9 +118,9 @@ def test_matches_budget_status_and_spending_by_category(session: Session, dev_us
     assert summary.categories == spending.categories
 
 
-def test_without_a_budget(session: Session, dev_user: User, add_expense: AddExpense):
+def test_without_a_budget(session: Session, main_user: User, add_expense: AddExpense):
     add_expense(1000, date(2026, 11, 5))
-    result = november(session, dev_user)
+    result = november(session, main_user)
     assert result.total_expenses_cents == 1000
     assert result.budget_cents is None
     assert result.remaining_cents is None
@@ -128,10 +128,10 @@ def test_without_a_budget(session: Session, dev_user: User, add_expense: AddExpe
 
 
 def test_income_only_month_has_no_top_category(
-    session: Session, dev_user: User, add_income: AddIncome
+    session: Session, main_user: User, add_income: AddIncome
 ):
     add_income(300000, date(2026, 11, 1))
-    result = november(session, dev_user)
+    result = november(session, main_user)
     assert result.total_income_cents == 300000
     assert result.total_expenses_cents == 0
     assert result.categories == []
@@ -139,12 +139,12 @@ def test_income_only_month_has_no_top_category(
 
 
 def test_top_category_tie_goes_to_the_name_first_alphabetically(
-    session: Session, dev_user: User, add_expense: AddExpense
+    session: Session, main_user: User, add_expense: AddExpense
 ):
     # Transportation has the lower id, so this only passes if ties are broken by name.
     add_expense(1000, date(2026, 11, 5), category_id=TRANSPORTATION)
     add_expense(1000, date(2026, 11, 5), category_id=BILLS)
-    assert november(session, dev_user).top_category == TopCategory(BILLS, "Bills", 1000)
+    assert november(session, main_user).top_category == TopCategory(BILLS, "Bills", 1000)
 
 
 @pytest.mark.parametrize(
@@ -157,9 +157,9 @@ def test_top_category_tie_goes_to_the_name_first_alphabetically(
 )
 @pytest.mark.usefixtures("example_year")
 def test_year_to_date_runs_from_january_through_the_month(
-    session: Session, dev_user: User, month: int, ytd_income_cents: int, ytd_expenses_cents: int
+    session: Session, main_user: User, month: int, ytd_income_cents: int, ytd_expenses_cents: int
 ):
-    result = monthly_summary(session, dev_user, 2026, month)
+    result = monthly_summary(session, main_user, 2026, month)
     assert result.ytd_income_cents == ytd_income_cents
     assert result.ytd_expenses_cents == ytd_expenses_cents
 
@@ -167,7 +167,7 @@ def test_year_to_date_runs_from_january_through_the_month(
 @pytest.mark.usefixtures("example_year")
 def test_other_users_data_is_ignored(
     session: Session,
-    dev_user: User,
+    main_user: User,
     other_user: User,
     add_expense: AddExpense,
     add_income: AddIncome,
@@ -177,7 +177,7 @@ def test_other_users_data_is_ignored(
     add_income(33300, date(2026, 3, 1), user=other_user)
     add_expense(4400, date(2026, 3, 1), category_id=OTHER, user=other_user)
 
-    result = november(session, dev_user)
+    result = november(session, main_user)
     assert result.total_income_cents == 300000
     assert result.total_expenses_cents == 165000
     assert [c.category_name for c in result.categories] == ["Bills", "Food", "Shopping"]

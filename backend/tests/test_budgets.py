@@ -23,37 +23,37 @@ def all_budgets(session: Session) -> list[tuple[int, int, int, int]]:
 # Creating and replacing
 
 
-def test_creates_budget(client: TestClient, session: Session, dev_user: User):
+def test_creates_budget(client: TestClient, session: Session, main_user: User):
     response = client.put("/budgets/2026/11", json={"limit": "500.00"})
     assert response.status_code == 200
     assert response.json() == {"year": 2026, "month": 11, "limit": "500.00"}
-    assert all_budgets(session) == [(dev_user.id, 2026, 11, 50000)]
+    assert all_budgets(session) == [(main_user.id, 2026, 11, 50000)]
 
 
-def test_setting_again_replaces_the_limit(client: TestClient, session: Session, dev_user: User):
+def test_setting_again_replaces_the_limit(client: TestClient, session: Session, main_user: User):
     first = client.put("/budgets/2026/11", json={"limit": "500.00"})
     assert first.status_code == 200
-    assert all_budgets(session) == [(dev_user.id, 2026, 11, 50000)]
+    assert all_budgets(session) == [(main_user.id, 2026, 11, 50000)]
 
     response = client.put("/budgets/2026/11", json={"limit": "750.25"})
     assert response.status_code == 200
     assert response.json() == {"year": 2026, "month": 11, "limit": "750.25"}
-    assert all_budgets(session) == [(dev_user.id, 2026, 11, 75025)]
+    assert all_budgets(session) == [(main_user.id, 2026, 11, 75025)]
 
 
-def test_each_month_has_its_own_budget(client: TestClient, session: Session, dev_user: User):
+def test_each_month_has_its_own_budget(client: TestClient, session: Session, main_user: User):
     client.put("/budgets/2026/11", json={"limit": "500.00"})
     client.put("/budgets/2026/12", json={"limit": "650.00"})
     client.put("/budgets/2027/11", json={"limit": "700.00"})
     assert all_budgets(session) == [
-        (dev_user.id, 2026, 11, 50000),
-        (dev_user.id, 2026, 12, 65000),
-        (dev_user.id, 2027, 11, 70000),
+        (main_user.id, 2026, 11, 50000),
+        (main_user.id, 2026, 12, 65000),
+        (main_user.id, 2027, 11, 70000),
     ]
 
 
 def test_two_saves_at_once_for_a_new_month_keep_one_budget(
-    db_engine: Engine, session: Session, dev_user: User
+    db_engine: Engine, session: Session, main_user: User
 ):
     # E.g. a double-clicked Save. Each save runs in its own thread and session, like two requests.
     # The barrier holds each save just before it writes, until both have got that far, so the
@@ -65,7 +65,7 @@ def test_two_saves_at_once_for_a_new_month_keep_one_budget(
             both_ready_to_write.wait()
 
     event.listen(db_engine, "before_cursor_execute", wait_before_budget_insert)
-    user_id = dev_user.id
+    user_id = main_user.id
 
     def save(limit_cents: int) -> None:
         with Session(db_engine) as request_session:
@@ -93,16 +93,16 @@ def test_limit_can_be_sent_as_a_number(client: TestClient):
 
 
 def test_never_changes_another_users_budget(
-    client: TestClient, session: Session, dev_user: User, other_user: User, act_as: ActAs
+    client: TestClient, session: Session, main_user: User, other_user: User, act_as: ActAs
 ):
-    session.add(MonthlyBudget(user_id=dev_user.id, year=2026, month=11, limit_cents=50000))
+    session.add(MonthlyBudget(user_id=main_user.id, year=2026, month=11, limit_cents=50000))
     session.commit()
 
     act_as(other_user)
     response = client.put("/budgets/2026/11", json={"limit": "900.00"})
     assert response.status_code == 200
     assert all_budgets(session) == [
-        (dev_user.id, 2026, 11, 50000),
+        (main_user.id, 2026, 11, 50000),
         (other_user.id, 2026, 11, 90000),
     ]
 

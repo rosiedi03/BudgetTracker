@@ -19,30 +19,30 @@ def november(session: Session, user: User) -> SpendingByCategory:
 # Report function: totals, percentages, order
 
 
-def test_no_expenses(session: Session, dev_user: User):
-    assert november(session, dev_user) == SpendingByCategory(total_spent_cents=0, categories=[])
+def test_no_expenses(session: Session, main_user: User):
+    assert november(session, main_user) == SpendingByCategory(total_spent_cents=0, categories=[])
 
 
-def test_income_is_not_spending(session: Session, dev_user: User, add_income: AddIncome):
+def test_income_is_not_spending(session: Session, main_user: User, add_income: AddIncome):
     add_income(500000, date(2026, 11, 5))
-    assert november(session, dev_user) == SpendingByCategory(total_spent_cents=0, categories=[])
+    assert november(session, main_user) == SpendingByCategory(total_spent_cents=0, categories=[])
 
 
-def test_single_category(session: Session, dev_user: User, add_expense: AddExpense):
+def test_single_category(session: Session, main_user: User, add_expense: AddExpense):
     add_expense(1000, date(2026, 11, 5), category_id=FOOD)
-    assert november(session, dev_user) == SpendingByCategory(
+    assert november(session, main_user) == SpendingByCategory(
         total_spent_cents=1000,
         categories=[CategorySpending(FOOD, "Food", 1000, Decimal("100.0"))],
     )
 
 
 def test_categories_sorted_by_total_with_percentages(
-    session: Session, dev_user: User, add_expense: AddExpense
+    session: Session, main_user: User, add_expense: AddExpense
 ):
     add_expense(3000, date(2026, 11, 5), category_id=FOOD)
     add_expense(5000, date(2026, 11, 5), category_id=BILLS)
     add_expense(2000, date(2026, 11, 5), category_id=SHOPPING)
-    assert november(session, dev_user) == SpendingByCategory(
+    assert november(session, main_user) == SpendingByCategory(
         total_spent_cents=10000,
         categories=[
             CategorySpending(BILLS, "Bills", 5000, Decimal("50.0")),
@@ -53,12 +53,12 @@ def test_categories_sorted_by_total_with_percentages(
 
 
 def test_expenses_in_the_same_category_are_added_together(
-    session: Session, dev_user: User, add_expense: AddExpense
+    session: Session, main_user: User, add_expense: AddExpense
 ):
     add_expense(1000, date(2026, 11, 2), category_id=FOOD)
     add_expense(2500, date(2026, 11, 20), category_id=FOOD)
     add_expense(500, date(2026, 11, 5), category_id=BILLS)
-    result = november(session, dev_user)
+    result = november(session, main_user)
     assert [(c.category_name, c.total_cents) for c in result.categories] == [
         ("Food", 3500),
         ("Bills", 500),
@@ -66,12 +66,12 @@ def test_expenses_in_the_same_category_are_added_together(
     assert result.total_spent_cents == 4000
 
 
-def test_ties_are_ordered_by_name(session: Session, dev_user: User, add_expense: AddExpense):
+def test_ties_are_ordered_by_name(session: Session, main_user: User, add_expense: AddExpense):
     # Id order (Food, Transportation, Bills) differs from name order, so this tells them apart.
     add_expense(1000, date(2026, 11, 5), category_id=TRANSPORTATION)
     add_expense(1000, date(2026, 11, 5), category_id=FOOD)
     add_expense(1000, date(2026, 11, 5), category_id=BILLS)
-    result = november(session, dev_user)
+    result = november(session, main_user)
     assert [c.category_name for c in result.categories] == ["Bills", "Food", "Transportation"]
     # Equal thirds each round to 33.3, so the percentages add up to 99.9, not 100.
     assert [c.percent for c in result.categories] == [Decimal("33.3")] * 3
@@ -81,25 +81,25 @@ def test_ties_are_ordered_by_name(session: Session, dev_user: User, add_expense:
 
 
 def test_only_expenses_within_the_month_count(
-    session: Session, dev_user: User, add_expense: AddExpense
+    session: Session, main_user: User, add_expense: AddExpense
 ):
     add_expense(100, date(2026, 11, 1), category_id=FOOD)
     add_expense(200, date(2026, 11, 30), category_id=FOOD)
     add_expense(1000, date(2026, 10, 31), category_id=BILLS)
     add_expense(1000, date(2026, 12, 1), category_id=SHOPPING)
     add_expense(1000, date(2025, 11, 15), category_id=TRANSPORTATION)
-    assert november(session, dev_user) == SpendingByCategory(
+    assert november(session, main_user) == SpendingByCategory(
         total_spent_cents=300,
         categories=[CategorySpending(FOOD, "Food", 300, Decimal("100.0"))],
     )
 
 
 def test_other_users_expenses_are_ignored(
-    session: Session, dev_user: User, other_user: User, add_expense: AddExpense
+    session: Session, main_user: User, other_user: User, add_expense: AddExpense
 ):
     add_expense(1000, date(2026, 11, 5), category_id=FOOD)
     add_expense(9000, date(2026, 11, 5), category_id=SHOPPING, user=other_user)
-    assert november(session, dev_user) == SpendingByCategory(
+    assert november(session, main_user) == SpendingByCategory(
         total_spent_cents=1000,
         categories=[CategorySpending(FOOD, "Food", 1000, Decimal("100.0"))],
     )

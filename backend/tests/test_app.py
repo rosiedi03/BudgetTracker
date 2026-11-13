@@ -18,7 +18,7 @@ REQUEST_LOGGER = "budgettracker.requests"
 
 
 @pytest.fixture
-def probe_client(dev_user: User, token_for: TokenFor) -> TestClient:
+def probe_client(main_user: User, token_for: TokenFor) -> TestClient:
     """A small app with the real logging middleware and test-only routes.
 
     Keeps test routes out of the real app while exercising the same middleware and dependencies.
@@ -39,7 +39,7 @@ def probe_client(dev_user: User, token_for: TokenFor) -> TestClient:
         raise RuntimeError("internal detail that must not reach the client")
 
     probe.dependency_overrides = app.dependency_overrides
-    return TestClient(probe, headers=token_for(dev_user))
+    return TestClient(probe, headers=token_for(main_user))
 
 
 def request_log_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
