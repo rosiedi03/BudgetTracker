@@ -172,6 +172,44 @@ def monthly_summary(session: Session, user: User, year: int, month: int) -> Mont
     )
 
 
+@dataclass
+class TransactionTotals:
+    income_cents: int
+    expenses_cents: int
+
+
+def transaction_totals(
+    session: Session,
+    user: User,
+    *,
+    transaction_type: TransactionType | None = None,
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
+) -> TransactionTotals:
+    """Income and expense totals for the user's transactions matching the given filters.
+
+    Matches the transaction list: each filter is optional, and both dates are inclusive.
+    """
+    query = (
+        select(Transaction.type, func.sum(Transaction.amount_cents))
+        .where(Transaction.user_id == user.id)
+        .group_by(Transaction.type)
+    )
+    if transaction_type is not None:
+        query = query.where(Transaction.type == transaction_type)
+    if start_date is not None:
+        query = query.where(Transaction.date >= start_date)
+    if end_date is not None:
+        query = query.where(Transaction.date <= end_date)
+
+    # At most two rows: one per type that has any matching transactions.
+    totals = {row_type: total for row_type, total in session.execute(query).all()}
+    return TransactionTotals(
+        income_cents=totals.get(TransactionType.income, 0),
+        expenses_cents=totals.get(TransactionType.expense, 0),
+    )
+
+
 def _total_cents(
     session: Session,
     user: User,
