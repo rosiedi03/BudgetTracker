@@ -36,7 +36,7 @@ def november(session: Session, user: User) -> MonthlySummary:
 def example_year(
     session: Session, main_user: User, add_expense: AddExpense, add_income: AddIncome
 ) -> None:
-    """A year of the dev user's data, built around November 2026.
+    """A year of main_user's data, built around November 2026.
 
     November: budget 2000.00, income 3000.00, and expenses Food 300.00, Bills 1200.00, and
     Shopping 150.00.

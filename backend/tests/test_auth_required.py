@@ -67,17 +67,17 @@ def test_with_a_valid_token_works(
 def test_the_token_decides_whose_data_is_used(
     main_user: User, other_user: User, token_for: TokenFor, add_expense: AddExpense
 ):
-    add_expense(1000, date(2026, 11, 5))  # the dev user's
-    dev_headers = token_for(main_user)
+    add_expense(1000, date(2026, 11, 5))  # main_user's
+    main_headers = token_for(main_user)
     other_headers = token_for(other_user)
 
-    dev_summary = send("GET", "/reports/2026/11/summary", dev_headers)
+    main_summary = send("GET", "/reports/2026/11/summary", main_headers)
     other_summary = send("GET", "/reports/2026/11/summary", other_headers)
-    assert dev_summary.status_code == 200
+    assert main_summary.status_code == 200
     assert other_summary.status_code == 200
-    assert dev_summary.json()["total_expenses"] == "10.00"
+    assert main_summary.json()["total_expenses"] == "10.00"
     assert other_summary.json()["total_expenses"] == "0.00"
 
     assert send("PUT", "/budgets/2026/11", other_headers).status_code == 200
     assert send("GET", "/budgets/2026/11", other_headers).status_code == 200
-    assert send("GET", "/budgets/2026/11", dev_headers).status_code == 404
+    assert send("GET", "/budgets/2026/11", main_headers).status_code == 404

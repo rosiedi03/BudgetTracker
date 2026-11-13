@@ -7,12 +7,8 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
-from budgettracker.db import DEFAULT_CATEGORY_NAMES, DEV_USER_EMAIL, init_db
+from budgettracker.db import DEFAULT_CATEGORY_NAMES, init_db
 from budgettracker.models import Category, MonthlyBudget, Transaction, TransactionType, User
-
-
-def dev_user_id(session: Session) -> int:
-    return session.scalars(select(User.id).where(User.email == DEV_USER_EMAIL)).one()
 
 
 def assert_rejected(session: Session, row: object) -> None:
@@ -38,22 +34,21 @@ def test_categories_are_seeded_in_order(session: Session):
     ]
 
 
-def test_dev_user_is_seeded(session: Session):
-    users = session.scalars(select(User)).all()
-    assert [u.email for u in users] == [DEV_USER_EMAIL]
+def test_no_users_are_seeded(session: Session):
+    assert session.scalars(select(User)).all() == []
 
 
 def test_init_db_can_run_again_without_duplicating_seed_data(db_engine: Engine, session: Session):
     init_db(db_engine)  # the fixture already ran it once
     assert session.scalar(select(func.count()).select_from(Category)) == len(DEFAULT_CATEGORY_NAMES)
-    assert session.scalar(select(func.count()).select_from(User)) == 1
+    assert session.scalar(select(func.count()).select_from(User)) == 0
 
 
 # Valid rows (so the rejection tests below can't pass just because every insert fails)
 
 
-def test_valid_expense_and_income_are_saved(session: Session):
-    user_id = dev_user_id(session)
+def test_valid_expense_and_income_are_saved(session: Session, main_user: User):
+    user_id = main_user.id
     session.add(
         Transaction(
             user_id=user_id,
@@ -79,9 +74,9 @@ def test_valid_expense_and_income_are_saved(session: Session):
 # Foreign keys
 
 
-def test_transaction_with_nonexistent_category_is_rejected(session: Session):
+def test_transaction_with_nonexistent_category_is_rejected(session: Session, main_user: User):
     row = Transaction(
-        user_id=dev_user_id(session),
+        user_id=main_user.id,
         type=TransactionType.expense,
         amount_cents=100,
         category_id=999,
@@ -98,9 +93,9 @@ def test_budget_for_nonexistent_user_is_rejected(session: Session):
 
 
 @pytest.mark.parametrize("amount_cents", [0, -100])
-def test_transaction_amount_must_be_positive(session: Session, amount_cents: int):
+def test_transaction_amount_must_be_positive(session: Session, main_user: User, amount_cents: int):
     row = Transaction(
-        user_id=dev_user_id(session),
+        user_id=main_user.id,
         type=TransactionType.expense,
         amount_cents=amount_cents,
         category_id=1,
@@ -109,9 +104,9 @@ def test_transaction_amount_must_be_positive(session: Session, amount_cents: int
     assert_rejected(session, row)
 
 
-def test_expense_without_category_is_rejected(session: Session):
+def test_expense_without_category_is_rejected(session: Session, main_user: User):
     row = Transaction(
-        user_id=dev_user_id(session),
+        user_id=main_user.id,
         type=TransactionType.expense,
         amount_cents=100,
         date=datetime.date(2026, 11, 1),
@@ -119,9 +114,9 @@ def test_expense_without_category_is_rejected(session: Session):
     assert_rejected(session, row)
 
 
-def test_income_with_category_is_rejected(session: Session):
+def test_income_with_category_is_rejected(session: Session, main_user: User):
     row = Transaction(
-        user_id=dev_user_id(session),
+        user_id=main_user.id,
         type=TransactionType.income,
         amount_cents=100,
         category_id=1,
@@ -131,19 +126,19 @@ def test_income_with_category_is_rejected(session: Session):
 
 
 @pytest.mark.parametrize("limit_cents", [0, -100])
-def test_budget_limit_must_be_positive(session: Session, limit_cents: int):
-    row = MonthlyBudget(user_id=dev_user_id(session), year=2026, month=11, limit_cents=limit_cents)
+def test_budget_limit_must_be_positive(session: Session, main_user: User, limit_cents: int):
+    row = MonthlyBudget(user_id=main_user.id, year=2026, month=11, limit_cents=limit_cents)
     assert_rejected(session, row)
 
 
 @pytest.mark.parametrize("month", [0, 13])
-def test_budget_month_must_be_1_to_12(session: Session, month: int):
-    row = MonthlyBudget(user_id=dev_user_id(session), year=2026, month=month, limit_cents=100)
+def test_budget_month_must_be_1_to_12(session: Session, main_user: User, month: int):
+    row = MonthlyBudget(user_id=main_user.id, year=2026, month=month, limit_cents=100)
     assert_rejected(session, row)
 
 
-def test_second_budget_for_same_user_and_month_is_rejected(session: Session):
-    user_id = dev_user_id(session)
+def test_second_budget_for_same_user_and_month_is_rejected(session: Session, main_user: User):
+    user_id = main_user.id
     session.add(MonthlyBudget(user_id=user_id, year=2026, month=11, limit_cents=100))
     session.commit()
     assert_rejected(session, MonthlyBudget(user_id=user_id, year=2026, month=11, limit_cents=200))
@@ -153,8 +148,8 @@ def test_uppercase_email_is_rejected(session: Session):
     assert_rejected(session, User(email="Someone@Example.com", password_hash="x"))
 
 
-def test_duplicate_email_is_rejected(session: Session):
-    assert_rejected(session, User(email=DEV_USER_EMAIL, password_hash="x"))
+def test_duplicate_email_is_rejected(session: Session, main_user: User):
+    assert_rejected(session, User(email=main_user.email, password_hash="x"))
 
 
 # UTC timestamps

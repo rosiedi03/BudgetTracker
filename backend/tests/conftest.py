@@ -13,10 +13,10 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from budgettracker.db import DEV_USER_EMAIL, create_db_engine, get_session, init_db
+from budgettracker.db import create_db_engine, get_session, init_db
 from budgettracker.deps import get_authenticated_user, hash_token
 from budgettracker.main import app
 from budgettracker.models import AuthToken, Transaction, TransactionType, User, utc_now
@@ -87,14 +87,17 @@ def token_for(session: Session) -> TokenFor:
 
 @pytest.fixture
 def client(main_user: User, token_for: TokenFor) -> TestClient:
-    """Sends requests to the app without running a server, logged in as the dev user."""
+    """Sends requests to the app without running a server, logged in as main_user."""
     return TestClient(app, headers=token_for(main_user))
 
 
 @pytest.fixture
 def main_user(session: Session) -> User:
-    """The seeded user that requests act as by default."""
-    return session.scalars(select(User).where(User.email == DEV_USER_EMAIL)).one()
+    """The user tests act as unless they say otherwise; `client` is logged in as this user."""
+    user = User(email="main@example.com", password_hash="x")
+    session.add(user)
+    session.commit()
+    return user
 
 
 @pytest.fixture
@@ -130,7 +133,7 @@ def logged_out() -> None:
 def add_expense(session: Session, main_user: User) -> AddExpense:
     """A function that saves an expense: add_expense(1250, date(2026, 11, 5)).
 
-    Optional: category_id (default Food) and user (default the dev user).
+    Optional: category_id (default Food) and user (default main_user).
     """
 
     def add(

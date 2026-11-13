@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from budgettracker.db import DEV_USER_EMAIL, create_db_engine, get_session
+from budgettracker.db import create_db_engine, get_session
 from budgettracker.deps import AuthenticatedUserDep
 from budgettracker.main import app, log_requests
 from budgettracker.models import User
@@ -72,10 +72,10 @@ def test_health_returns_503_when_database_is_unreachable(client: TestClient, tmp
 # Current user
 
 
-def test_current_user_is_the_dev_user(probe_client: TestClient):
+def test_current_user_is_the_user_whose_token_was_sent(probe_client: TestClient, main_user: User):
     response = probe_client.get("/whoami")
     assert response.status_code == 200
-    assert response.json()["email"] == DEV_USER_EMAIL
+    assert response.json()["email"] == main_user.email
 
 
 # Request logging

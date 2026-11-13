@@ -8,7 +8,7 @@ from fastapi import Depends
 from sqlalchemy import Engine, create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from budgettracker.models import Base, Category, User
+from budgettracker.models import Base, Category
 
 # Defaults to a file in the directory the server is started from.
 DATABASE_URL = os.environ.get("BUDGETTRACKER_DATABASE_URL", "sqlite:///./budgettracker.db")
@@ -18,10 +18,6 @@ SQLITE_BUSY_TIMEOUT_SECONDS = 5
 
 # Inserted in this order, so on a fresh database their ids are 1-6.
 DEFAULT_CATEGORY_NAMES = ["Food", "Transportation", "Bills", "Entertainment", "Shopping", "Other"]
-
-# Stand-in user until login exists. "!" is not a valid password hash, so nobody can log in as it.
-DEV_USER_EMAIL = "dev@example.com"
-DEV_USER_UNUSABLE_PASSWORD_HASH = "!"
 
 
 def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
@@ -62,14 +58,13 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def init_db(engine: Engine) -> None:
-    """Create missing tables and seed default data. Safe to run on every startup.
+    """Create missing tables and seed the default categories. Safe to run on every startup.
 
     Existing tables are never altered: after changing a model, delete the .db file and restart.
     """
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         _seed_categories(session)
-        _seed_dev_user(session)
         session.commit()
 
 
@@ -78,9 +73,3 @@ def _seed_categories(session: Session) -> None:
     for name in DEFAULT_CATEGORY_NAMES:
         if name not in existing_names:
             session.add(Category(name=name))
-
-
-def _seed_dev_user(session: Session) -> None:
-    existing = session.scalar(select(User).where(User.email == DEV_USER_EMAIL))
-    if existing is None:
-        session.add(User(email=DEV_USER_EMAIL, password_hash=DEV_USER_UNUSABLE_PASSWORD_HASH))

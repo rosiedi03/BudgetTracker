@@ -133,7 +133,7 @@ def test_endpoint_with_no_expenses(client: TestClient):
 def test_endpoint_uses_the_current_user(
     client: TestClient, other_user: User, act_as: ActAs, add_expense: AddExpense
 ):
-    add_expense(1000, date(2026, 11, 5))  # the dev user's
+    add_expense(1000, date(2026, 11, 5))  # main_user's
     act_as(other_user)  # who has no expenses
     response = client.get(PATH)
     assert response.status_code == 200
