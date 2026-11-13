@@ -1,7 +1,14 @@
 """Report calculations. Plain functions, kept separate from the routers so they're easy to test."""
 
 import datetime
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from budgettracker.budgets import find_monthly_budget
+from budgettracker.models import Transaction, TransactionType, User
 
 
 def month_date_range(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -22,6 +29,60 @@ def percent_of(part_cents: int, whole_cents: int) -> Decimal:
     """part / whole as a percentage, rounded half-up to one decimal place (1 of 3 -> 33.3)."""
     percent = Decimal(part_cents) * 100 / Decimal(whole_cents)
     return percent.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+
+
+@dataclass
+class BudgetStatus:
+    """A month's budget compared with what was spent. None fields mean no budget is set."""
+
+    year: int
+    month: int
+    limit_cents: int | None
+    spent_cents: int
+    remaining_cents: int | None
+    percent_used: Decimal | None
+
+
+def budget_status(session: Session, user: User, year: int, month: int) -> BudgetStatus:
+    """The user's budget for the month and how much of it their expenses have used."""
+    start, end = month_date_range(year, month)
+    spent_cents = _total_cents(session, user, TransactionType.expense, start, end)
+    budget = find_monthly_budget(session, user, year, month)
+    if budget is None:
+        return BudgetStatus(
+            year=year,
+            month=month,
+            limit_cents=None,
+            spent_cents=spent_cents,
+            remaining_cents=None,
+            percent_used=None,
+        )
+    return BudgetStatus(
+        year=year,
+        month=month,
+        limit_cents=budget.limit_cents,
+        spent_cents=spent_cents,
+        remaining_cents=budget.limit_cents - spent_cents,
+        percent_used=percent_of(spent_cents, budget.limit_cents),
+    )
+
+
+def _total_cents(
+    session: Session,
+    user: User,
+    transaction_type: TransactionType,
+    start: datetime.date,
+    end: datetime.date,
+) -> int:
+    """Sum of the user's income or expenses dated start <= date < end, added up by the database."""
+    # coalesce(..., 0): SUM over no rows is NULL in SQL; this turns it into 0.
+    total = select(func.coalesce(func.sum(Transaction.amount_cents), 0)).where(
+        Transaction.user_id == user.id,
+        Transaction.type == transaction_type,
+        Transaction.date >= start,
+        Transaction.date < end,
+    )
+    return session.execute(total).scalar_one()
 
 
 def _first_day_of_next_month(year: int, month: int) -> datetime.date:
