@@ -1,14 +1,15 @@
-"""PLACEHOLDER: in-memory expense/income routes, to be replaced by database-backed ones."""
+"""Expense and income endpoints."""
 
 from datetime import date
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from budgettracker.deps import AuthenticatedUserDep
+
 router = APIRouter(tags=["transactions"])
 
 
-# Expense information received from the frontend
 class Expense(BaseModel):
     amount: float = Field(gt=0)
     category: str
@@ -17,22 +18,6 @@ class Expense(BaseModel):
     payer: str = ""
 
 
-# Temporary storage until the database is connected
-expenses = []
-
-
-@router.post("/expenses")
-def add_expense(expense: Expense):
-    expenses.append(expense.model_dump(mode="json"))
-    return {"message": "Expense added successfully"}
-
-
-@router.get("/expenses")
-def get_expenses():
-    return expenses
-
-
-# Income information received from the frontend
 class Income(BaseModel):
     amount: float = Field(gt=0)
     source: str
@@ -40,34 +25,52 @@ class Income(BaseModel):
     description: str = ""
 
 
-# Temporary income storage
-incomes = []
+# Temporary data separated by user ID
+expenses = {}
+incomes = {}
 
 
+# Add an expense for the logged-in user
+@router.post("/expenses")
+def add_expense(expense: Expense, user: AuthenticatedUserDep):
+    expenses.setdefault(user.id, []).append(expense.model_dump(mode="json"))
+    return {"message": "Expense added successfully"}
+
+
+# View only the user's expenses
+@router.get("/expenses")
+def get_expenses(user: AuthenticatedUserDep):
+    return expenses.get(user.id, [])
+
+
+# Add income for the logged-in user
 @router.post("/income")
-def add_income(income: Income):
-    incomes.append(income.model_dump(mode="json"))
+def add_income(income: Income, user: AuthenticatedUserDep):
+    incomes.setdefault(user.id, []).append(income.model_dump(mode="json"))
     return {"message": "Income added successfully"}
 
 
+# View only the user's income
 @router.get("/income")
-def get_income():
-    return incomes
+def get_income(user: AuthenticatedUserDep):
+    return incomes.get(user.id, [])
 
 
-# Update an existing expense
+# Update only the user's expense
 @router.put("/expenses/{index}")
-def update_expense(index: int, expense: Expense):
-    if index < 0 or index >= len(expenses):
+def update_expense(index: int, expense: Expense, user: AuthenticatedUserDep):
+    user_expenses = expenses.get(user.id, [])
+    if index < 0 or index >= len(user_expenses):
         raise HTTPException(status_code=404, detail="Expense not found")
-    expenses[index] = expense.model_dump(mode="json")
+    user_expenses[index] = expense.model_dump(mode="json")
     return {"message": "Expense updated successfully"}
 
 
-# Delete an existing expense
+# Delete only the user's expense
 @router.delete("/expenses/{index}")
-def delete_expense(index: int):
-    if index < 0 or index >= len(expenses):
+def delete_expense(index: int, user: AuthenticatedUserDep):
+    user_expenses = expenses.get(user.id, [])
+    if index < 0 or index >= len(user_expenses):
         raise HTTPException(status_code=404, detail="Expense not found")
-    expenses.pop(index)
+    user_expenses.pop(index)
     return {"message": "Expense deleted successfully"}
