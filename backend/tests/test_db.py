@@ -10,8 +10,6 @@ from sqlalchemy.orm import Session
 from budgettracker.db import DEFAULT_CATEGORY_NAMES, DEV_USER_EMAIL, init_db
 from budgettracker.models import Category, MonthlyBudget, Transaction, TransactionType, User
 
-NOV_1 = datetime.date(2026, 11, 1)
-
 
 def dev_user_id(session: Session) -> int:
     return session.scalars(select(User.id).where(User.email == DEV_USER_EMAIL)).one()
@@ -62,11 +60,16 @@ def test_valid_expense_and_income_are_saved(session: Session):
             type=TransactionType.expense,
             amount_cents=1250,
             category_id=1,
-            date=NOV_1,
+            date=datetime.date(2026, 11, 1),
         )
     )
     session.add(
-        Transaction(user_id=user_id, type=TransactionType.income, amount_cents=500000, date=NOV_1)
+        Transaction(
+            user_id=user_id,
+            type=TransactionType.income,
+            amount_cents=500000,
+            date=datetime.date(2026, 11, 1),
+        )
     )
     session.add(MonthlyBudget(user_id=user_id, year=2026, month=11, limit_cents=100000))
     session.commit()
@@ -82,7 +85,7 @@ def test_transaction_with_nonexistent_category_is_rejected(session: Session):
         type=TransactionType.expense,
         amount_cents=100,
         category_id=999,
-        date=NOV_1,
+        date=datetime.date(2026, 11, 1),
     )
     assert_rejected(session, row)
 
@@ -101,14 +104,17 @@ def test_transaction_amount_must_be_positive(session: Session, amount_cents: int
         type=TransactionType.expense,
         amount_cents=amount_cents,
         category_id=1,
-        date=NOV_1,
+        date=datetime.date(2026, 11, 1),
     )
     assert_rejected(session, row)
 
 
 def test_expense_without_category_is_rejected(session: Session):
     row = Transaction(
-        user_id=dev_user_id(session), type=TransactionType.expense, amount_cents=100, date=NOV_1
+        user_id=dev_user_id(session),
+        type=TransactionType.expense,
+        amount_cents=100,
+        date=datetime.date(2026, 11, 1),
     )
     assert_rejected(session, row)
 
@@ -119,7 +125,7 @@ def test_income_with_category_is_rejected(session: Session):
         type=TransactionType.income,
         amount_cents=100,
         category_id=1,
-        date=NOV_1,
+        date=datetime.date(2026, 11, 1),
     )
     assert_rejected(session, row)
 

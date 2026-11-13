@@ -70,6 +70,8 @@ backend/
 │       ├── deps.py         # shared endpoint dependencies (current user)
 │       └── routers/        # endpoints, one module per area
 └── tests/
+    ├── conftest.py         # shared fixtures (test database, users, adding transactions)
+    └── helpers.py          # shared constants and types (seeded category ids, fixture types)
 ```
 
 The database is a SQLite file, `budgettracker.db`, created in the directory you start the server
