@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from budgettracker.budgets import find_monthly_budget
-from budgettracker.models import Transaction, TransactionType, User
+from budgettracker.models import Category, Transaction, TransactionType, User
 
 
 def month_date_range(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -65,6 +65,55 @@ def budget_status(session: Session, user: User, year: int, month: int) -> Budget
         remaining_cents=budget.limit_cents - spent_cents,
         percent_used=percent_of(spent_cents, budget.limit_cents),
     )
+
+
+@dataclass
+class CategorySpending:
+    category_id: int
+    category_name: str
+    total_cents: int
+    percent: Decimal  # share of the month's total spending
+
+
+@dataclass
+class SpendingByCategory:
+    """A month's expenses by category. Only categories with spending are listed."""
+
+    total_spent_cents: int
+    categories: list[CategorySpending]  # highest total first; ties by name
+
+
+def spending_by_category(session: Session, user: User, year: int, month: int) -> SpendingByCategory:
+    """How the user's expenses for the month split across categories."""
+    start, end = month_date_range(year, month)
+    category_total = func.sum(Transaction.amount_cents)
+    query = (
+        select(Category.id, Category.name, category_total)
+        .select_from(Transaction)
+        .join(Category, Transaction.category_id == Category.id)
+        .where(
+            Transaction.user_id == user.id,
+            Transaction.type == TransactionType.expense,
+            Transaction.date >= start,
+            Transaction.date < end,
+        )
+        .group_by(Category.id, Category.name)
+        .order_by(category_total.desc(), Category.name)
+    )
+    rows = session.execute(query).all()
+
+    # One row per category that has spending, so this adds up at most a handful of numbers.
+    total_spent_cents = sum(total for _, _, total in rows)
+    categories = [
+        CategorySpending(
+            category_id=category_id,
+            category_name=name,
+            total_cents=total,
+            percent=percent_of(total, total_spent_cents),
+        )
+        for category_id, name, total in rows
+    ]
+    return SpendingByCategory(total_spent_cents=total_spent_cents, categories=categories)
 
 
 def _total_cents(
